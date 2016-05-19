@@ -1,0 +1,59 @@
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 23
+    buildToolsVersion "23.0.2"
+
+    defaultConfig {
+        minSdkVersion 15
+        targetSdkVersion 23
+        versionCode 1
+        versionName "0.1.0-beta"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    testCompile 'junit:junit:4.12'
+    compile 'com.android.support:appcompat-v7:23.4.0'
+
+    compile 'com.aliyun.dpa:oss-android-sdk:2.2.0'
+    compile 'com.aliyun:aliyun-java-sdk-core:2.1.7'
+    compile 'com.aliyun:aliyun-java-sdk-sts:2.1.6'
+}
+
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'com.github.dcendents.android-maven'
+
+ext {
+    bintrayRepo = 'maven'
+    bintrayName = 'alioss'
+
+    publishedGroupId = 'com.yieldnull'
+    libraryName = 'alioss'
+    artifact = 'alioss-img'
+
+    libraryDescription = 'An android library for uploading images and videos to Aliyun-OSS'
+
+    siteUrl = 'https://github.com/YieldNull/Alioss'
+    gitUrl = 'https://github.com/YieldNull/Alioss.git'
+
+    libraryVersion = '0.1.0-beta'
+
+    developerId = 'yieldnull'
+    developerName = 'YieldNull'
+    developerEmail = 'yieldnull@gmail.com'
+
+    licenseName = 'The Apache Software License, Version 2.0'
+    licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+    allLicenses = ["Apache-2.0"]
+}
+
+apply from: 'install.gradle'
+apply from: 'bintray.gradle'
