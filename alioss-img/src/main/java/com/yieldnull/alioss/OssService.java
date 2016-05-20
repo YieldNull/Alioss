@@ -41,11 +41,14 @@ import com.aliyuncs.sts.model.v20150401.AssumeRoleResponse;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -83,10 +86,10 @@ public class OssService extends Service {
 
                 WifiManager wifiManager = (WifiManager) context.getSystemService(WIFI_SERVICE);
 
-                if (wifiManager.getWifiState() == WifiManager.WIFI_STATE_DISABLING) {
+                if (wifiManager.getWifiState() == WifiManager.WIFI_STATE_DISABLED) {
 
-                    Log.i(TAG, "Received broadcast. WIFI_STATE_DISABLING. Action:" + action);
-                    Log.i(TAG, "Disabling OssService");
+                    Log.i(TAG, "Received broadcast. WIFI_STATE_DISABLED");
+                    Log.i(TAG, "Stopping OssService");
 
                     OssService.stopService(context);
                 }
@@ -99,7 +102,7 @@ public class OssService extends Service {
                 if (info != null && info.getType() == ConnectivityManager.TYPE_WIFI) {
                     Log.i(TAG, "Received broadcast. Connected to WIFI. Action:" + action);
 
-                    Log.i(TAG, "Enabling OssService");
+                    Log.i(TAG, "Starting OssService");
 
                     OssService.startService(context);
                 }
@@ -153,7 +156,7 @@ public class OssService extends Service {
     private OSSClient mOssClient;
 
     private boolean mIsRunning;
-    private int mServerErrCounter;
+    private int mTaskErrCounter;
     private LinkedBlockingQueue<OSSAsyncTask> mCurrentTasks;
 
 
@@ -209,7 +212,11 @@ public class OssService extends Service {
         if (intent == null || intent.getAction().equals(ACTION_ENABLE)) {
             Log.i(TAG, "Received enable command");
 
-            startUpload();
+            if (mIsRunning) {
+                Log.i(TAG, "Service is already running");
+            } else {
+                startUpload();
+            }
 
         } else if (intent.getAction().equals(ACTION_DISABLE)) {
             Log.i(TAG, "Received disable command");
@@ -231,34 +238,37 @@ public class OssService extends Service {
     }
 
     private void startUpload() {
-        if (mIsRunning && mCurrentTasks.size() > 0) {
-            Log.i(TAG, "Service is already running");
-            return;
-        }
-
-        mIsRunning = true;
         NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
 
         if (info == null || info.getType() != ConnectivityManager.TYPE_WIFI) {
             Log.i(TAG, "Has not connected to Wifi. Aborting...");
-            mIsRunning = false;
+            stopSelf();
             return;
         }
 
-        if (mServerErrCounter == TASKS_PER_EXE) {
+        if (mTaskErrCounter == TASKS_PER_EXE) {
             Log.i(TAG, "Remote Server Error On ALL TASKs. Aborting");
             stopSelf();
             return;
         }
 
-        mServerErrCounter = 0;
+        mIsRunning = true;
+        mTaskErrCounter = 0;
 
-        new Thread(new Runnable() {
+        mWorkingHandler.post(new Runnable() {
             @Override
             public void run() {
+
                 if (!isOnline()) {
                     Log.i(TAG, "Not online. Aborting");
-                    mIsRunning = false;
+
+                    mMainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            stopSelf();
+                        }
+                    });
+
                     return;
                 }
 
@@ -266,36 +276,37 @@ public class OssService extends Service {
 
                 if (tasks.size() == 0) {
                     Log.i(TAG, "There is no media files to handle. Aborting...");
-                    stopSelf();
+
+                    mMainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            stopSelf();
+                        }
+                    });
+
                     return;
                 }
 
                 mCurrentTasks.addAll(tasks);
 
-                mWorkingHandler.post(new Runnable() {
+                Log.i(TAG, "Waiting tasks to complete");
+
+                for (OSSAsyncTask task : mCurrentTasks) {
+                    task.waitUntilFinished();
+                }
+
+                Log.i(TAG, "Dispatching new tasks");
+
+                mCurrentTasks.clear();
+
+                mMainHandler.post(new Runnable() {
                     @Override
                     public void run() {
-
-                        Log.i(TAG, "Waiting previous tasks to complete");
-
-                        for (OSSAsyncTask task : mCurrentTasks) {
-                            task.waitUntilFinished();
-                        }
-
-                        Log.i(TAG, "Dispatching new tasks");
-
-                        mCurrentTasks.clear();
-
-                        mMainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                startUpload();
-                            }
-                        });
+                        startUpload();
                     }
                 });
             }
-        }).start();
+        });
 
     }
 
@@ -311,6 +322,8 @@ public class OssService extends Service {
         }
 
         mCurrentTasks.clear();
+
+        stopSelf();
     }
 
     private List<OSSAsyncTask> spawnSomeTask(int sum) {
@@ -330,9 +343,12 @@ public class OssService extends Service {
                 continue;
             }
 
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+            String timestamp = sdf.format(file.lastModified());
+
             PutObjectRequest putRequest = new PutObjectRequest(
                     BUCKET,
-                    mAndroidId + "/" + file.getParentFile().getName() + "/" + file.getName(),
+                    mAndroidId + "/" + file.getParentFile().getName() + "/" + timestamp + " " + file.getName(),
                     file.getAbsolutePath());
 
             Log.i(TAG, String.format("Added %s to task", file.getAbsolutePath()));
@@ -363,6 +379,7 @@ public class OssService extends Service {
 
                 @Override
                 public void onFailure(PutObjectRequest putObjectRequest, ClientException ce, ServiceException se) {
+                    mTaskErrCounter++;
 
                     if (ce != null) {
                         Log.w(TAG, ce);
@@ -370,7 +387,6 @@ public class OssService extends Service {
 
                     if (se != null) {
                         Log.w(TAG, "OSS ServiceException: " + se.toString());
-                        mServerErrCounter++;
                     }
                 }
             });
