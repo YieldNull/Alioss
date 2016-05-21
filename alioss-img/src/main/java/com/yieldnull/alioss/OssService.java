@@ -44,7 +44,6 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -56,24 +55,50 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+/***
+ * 将图片，视频自动备份至阿里云<a href="https://help.aliyun.com/document_detail/31883.html">OSS</a>。Service 会在 “:alioss”进程中运行
+ */
 public class OssService extends Service {
     private static final String TAG = OssService.class.getSimpleName();
 
-    private static final String ACTION_ENABLE = "com.bbbbiu.oss.OssService.action.ENABLE";
-    private static final String ACTION_DISABLE = "com.bbbbiu.oss.OssService.action.DISABLE";
+    /**
+     * Intent Action。开启 Service
+     */
+    private static final String ACTION_START = "com.bbbbiu.oss.OssService.action.ENABLE";
 
+    /**
+     * Intent Action。停止 Service
+     */
+    private static final String ACTION_STOP = "com.bbbbiu.oss.OssService.action.DISABLE";
+
+    /**
+     * 开启 Service
+     *
+     * @param context context
+     */
     public static void startService(Context context) {
         Intent intent = new Intent(context, OssService.class);
-        intent.setAction(ACTION_ENABLE);
+        intent.setAction(ACTION_START);
         context.startService(intent);
     }
 
+    /**
+     * 停止 Service
+     *
+     * @param context context
+     */
     public static void stopService(Context context) {
         Intent intent = new Intent(context, OssService.class);
-        intent.setAction(ACTION_DISABLE);
+        intent.setAction(ACTION_STOP);
         context.startService(intent);
     }
 
+    /**
+     * 接收 {@link WifiManager#NETWORK_STATE_CHANGED_ACTION} 广播，用来停止 Service。
+     * 当 {@link WifiManager#getWifiState()} 为 {@link WifiManager#WIFI_STATE_DISABLED} 时停止。
+     * 接收 {@link ConnectivityManager#CONNECTIVITY_ACTION} 广播，用来开启 Service。
+     * 当 {@link NetworkInfo#getType()} 为 {@link ConnectivityManager#TYPE_WIFI} 时开启。
+     */
     public static class WifiStateReceiver extends BroadcastReceiver {
         private static final String TAG = WifiStateReceiver.class.getSimpleName();
 
@@ -110,9 +135,15 @@ public class OssService extends Service {
         }
     }
 
+    /**
+     * 接收 {@link AlarmManager} 的 repeating alarm, 用来周期性检测新的媒体文件，并上传。
+     */
     public static class AlarmReceiver extends BroadcastReceiver {
         private static final String TAG = AlarmReceiver.class.getSimpleName();
 
+        /**
+         * PendingIntent Action
+         */
         public static final String ACTION_START = "com.bbbbiu.oss.OssService$AlarmReceiver.action_START";
 
         @Override
@@ -122,6 +153,12 @@ public class OssService extends Service {
             OssService.startService(context);
         }
 
+        /**
+         * 获取{@link AlarmManager#setInexactRepeating(int, long, long, PendingIntent)} 要发送的 {@link PendingIntent}
+         *
+         * @param context context
+         * @return PendingIntent
+         */
         public static PendingIntent getPendingIndent(Context context) {
             Intent intent = new Intent(context, AlarmReceiver.class);
             intent.setAction(ACTION_START);
@@ -176,7 +213,7 @@ public class OssService extends Service {
                 new OSSFederationCredentialProvider() {
                     @Override
                     public OSSFederationToken getFederationToken() {
-                        return OssStsService.assumeRole(ACCESS_KEY_ID, ACCESS_KEY_SECRET,
+                        return OssSts.assumeRole(ACCESS_KEY_ID, ACCESS_KEY_SECRET,
                                 ACCESS_ROLE_ARN, mAndroidId,
                                 null, ProtocolType.HTTPS);
                     }
@@ -209,16 +246,17 @@ public class OssService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null || intent.getAction().equals(ACTION_ENABLE)) {
+        if (intent == null || intent.getAction().equals(ACTION_START)) {
             Log.i(TAG, "Received enable command");
 
             if (mIsRunning) {
                 Log.i(TAG, "Service is already running");
             } else {
+                mIsRunning = true;
                 startUpload();
             }
 
-        } else if (intent.getAction().equals(ACTION_DISABLE)) {
+        } else if (intent.getAction().equals(ACTION_STOP)) {
             Log.i(TAG, "Received disable command");
 
             stopUpload();
@@ -252,7 +290,6 @@ public class OssService extends Service {
             return;
         }
 
-        mIsRunning = true;
         mTaskErrCounter = 0;
 
         mWorkingHandler.post(new Runnable() {
@@ -313,8 +350,6 @@ public class OssService extends Service {
     private void stopUpload() {
         Log.i(TAG, "Stopping all current pending tasks");
 
-        mIsRunning = false;
-
         for (OSSAsyncTask task : mCurrentTasks) {
             if (!task.isCompleted()) {
                 task.cancel();
@@ -326,6 +361,12 @@ public class OssService extends Service {
         stopSelf();
     }
 
+    /**
+     * 分配上传Task
+     *
+     * @param sum task总数
+     * @return 分配的异步任务列表
+     */
     private List<OSSAsyncTask> spawnSomeTask(int sum) {
         List<OSSAsyncTask> taskList = new ArrayList<>();
 
@@ -334,25 +375,32 @@ public class OssService extends Service {
         for (final String path : getSomeMedia(sum)) {
             final File file = new File(path);
 
+            // 检查文件是否存在，是否是文件，是否可读
             if (!(file.exists() && file.isFile() && file.canRead())) {
                 continue;
             }
 
+            // 限制文件大小
             if (file.length() > MAX_FILE_SIZE) {
                 Log.i(TAG, "File too large. Ignore it");
                 continue;
             }
 
+            // timestamp 前缀
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
             String timestamp = sdf.format(file.lastModified());
 
+            // 文件名： “设备ID/父文件夹/时间前缀+原文件名”
+            String fileName = mAndroidId + "/" + file.getParentFile().getName() + "/" + timestamp + " " + file.getName();
+
             PutObjectRequest putRequest = new PutObjectRequest(
                     BUCKET,
-                    mAndroidId + "/" + file.getParentFile().getName() + "/" + timestamp + " " + file.getName(),
+                    fileName,
                     file.getAbsolutePath());
 
             Log.i(TAG, String.format("Added %s to task", file.getAbsolutePath()));
 
+            // 大文件显示上传进度
             if (file.length() > MIN_SIZE_TO_PROGRESS)
                 putRequest.setProgressCallback(new OSSProgressCallback<PutObjectRequest>() {
                     private int previousProgress = -1;
@@ -368,6 +416,7 @@ public class OssService extends Service {
                     }
                 });
 
+            // 开启异步任务
             OSSAsyncTask task = mOssClient.asyncPutObject(putRequest, new OSSCompletedCallback<PutObjectRequest, PutObjectResult>() {
                 @Override
                 public void onSuccess(PutObjectRequest putObjectRequest, PutObjectResult putObjectResult) {
@@ -379,7 +428,7 @@ public class OssService extends Service {
 
                 @Override
                 public void onFailure(PutObjectRequest putObjectRequest, ClientException ce, ServiceException se) {
-                    mTaskErrCounter++;
+                    mTaskErrCounter++; // 失败数量
 
                     if (ce != null) {
                         Log.w(TAG, ce);
@@ -399,7 +448,11 @@ public class OssService extends Service {
         return taskList;
     }
 
-
+    /**
+     * 检测是否能连上网
+     *
+     * @return 是否能连上网
+     */
     private boolean isOnline() {
         Log.i(TAG, "Checking if the device can connect to the internet");
 
@@ -416,6 +469,12 @@ public class OssService extends Service {
         return false;
     }
 
+    /**
+     * 获取sum个没有上传的文件路径
+     *
+     * @param sum 获取总量
+     * @return 文件绝对路径
+     */
     private List<String> getSomeMedia(int sum) {
         Log.i(TAG, "Getting media files. Amount:" + sum);
 
@@ -444,15 +503,31 @@ public class OssService extends Service {
         return taskList;
     }
 
-    static class OssStsService {
-        private static final String TAG = OssStsService.class.getSimpleName();
+    /**
+     * <a href="https://help.aliyun.com/document_detail/28756.html">Aliyun STS</a>，用来获取OSS临时访问权限
+     */
+    private static class OssSts {
+        private static final String TAG = OssSts.class.getSimpleName();
 
         private static final String REGION_CN_HANGZHOU = "cn-hangzhou";
         private static final String STS_API_VERSION = "2015-04-01";
 
-        static OSSFederationToken assumeRole(String accessKeyId, String accessKeySecret,
-                                             String roleArn, String roleSessionName, String policy,
-                                             ProtocolType protocolType) {
+        /**
+         * 给<a href="https://help.aliyun.com/document_detail/28645.html">RAM用户</a> 赋予
+         * <a href="https://help.aliyun.com/document_detail/28649.html">角色</a>，
+         * 使该用户能够访问OSS资源
+         *
+         * @param accessKeyId     RAM 用户的 AccessKeyId
+         * @param accessKeySecret RAM 用户的 AccessKeySecret
+         * @param roleArn         角色 Arn
+         * @param roleSessionName 角色名
+         * @param policy          附加 Policy
+         * @param protocolType    请使用 HTTPS
+         * @return OSSFederationToken
+         */
+        public static OSSFederationToken assumeRole(String accessKeyId, String accessKeySecret,
+                                                    String roleArn, String roleSessionName, String policy,
+                                                    ProtocolType protocolType) {
 
             AssumeRoleResponse response = null;
 
@@ -488,18 +563,35 @@ public class OssService extends Service {
         }
     }
 
-    static class MediaScanner {
-        static final List<String> VIDEO_EXTENSION = Arrays.asList(
+    /**
+     * 从 {@link MediaStore} 获取媒体数据。
+     *
+     * @see MediaStore
+     */
+    private static class MediaScanner {
+
+        /**
+         * 视频文件后缀名列表。
+         *
+         * @see MediaScanner#scanVideo()
+         */
+        public static final List<String> VIDEO_EXTENSION = Arrays.asList(
                 "3gp", "mp4", "m4v", "mkv", "flv", "rmvb", "rm", "mov", "webm", "avi", "wmv"
         );
 
-        Context context;
+        private Context context;
 
         public MediaScanner(Context context) {
             this.context = context;
         }
 
-        private List<String> scanImage() {
+        /**
+         * 扫描图片。
+         *
+         * @return 图片绝对路径列表，不保证文件存在。
+         * @see android.provider.MediaStore.Images
+         */
+        public List<String> scanImage() {
             List<String> imageList = new ArrayList<>();
 
             Log.i(TAG, "Start scanning image files");
@@ -532,7 +624,19 @@ public class OssService extends Service {
             return imageList;
         }
 
-        private List<String> scanVideo() {
+        /**
+         * 扫描视频。
+         * <p/>
+         * 若手机有 Secondary Storage，则从 {@link android.provider.MediaStore.Files} 扫描视频文件对应的 MIME_TYPE 的文件
+         * <p/>
+         * 若没有，则从 {@link android.provider.MediaStore.Video} 扫描。
+         *
+         * @return 视频绝对路径列表，不保证文件存在。
+         * @see android.provider.MediaStore.Video
+         * @see android.provider.MediaStore.Files
+         * @see MediaScanner#scanFileWithExtension(Context, List)
+         */
+        public List<String> scanVideo() {
             List<String> videoList = new ArrayList<>();
             Log.i(TAG, "Start scanning video files");
 
@@ -571,7 +675,14 @@ public class OssService extends Service {
             return videoList;
         }
 
-        private List<String> scanFileWithExtension(Context context, List<String> extensionList) {
+        /**
+         * 从 {@link android.provider.MediaStore.Files} 中获取对应后缀名的文件
+         *
+         * @param context       context
+         * @param extensionList 文件后缀名列表，用来计算 MIME_TYPE
+         * @return 文件绝对路径列表，不保证文件存在
+         */
+        public List<String> scanFileWithExtension(Context context, List<String> extensionList) {
             Log.i(TAG, "Start scanning files with extension:" + extensionList.toString());
 
             List<String> resultSet = new ArrayList<>();
