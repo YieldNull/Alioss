@@ -12,10 +12,10 @@ import java.util.List;
 /**
  * Created by YieldNull at 5/19/16
  */
-public class OssDatabase extends SQLiteOpenHelper {
+class OssDatabase extends SQLiteOpenHelper {
     private static final String TAG = OssDatabase.class.getSimpleName();
 
-    private static final String DATABASE_NAME = "com.yieldnull.ossimg";
+    private static final String DATABASE_NAME = "com.yieldnull.alioss";
     private static int DATABASE_VERSION = 1;
 
 
@@ -26,7 +26,7 @@ public class OssDatabase extends SQLiteOpenHelper {
 
     private static OssDatabase sOssDatabase;
 
-    public static OssDatabase getSingleton(Context context) {
+    private static OssDatabase getSingleton(Context context) {
         if (sOssDatabase == null) {
             sOssDatabase = new OssDatabase(context);
         }
@@ -34,7 +34,7 @@ public class OssDatabase extends SQLiteOpenHelper {
         return sOssDatabase;
     }
 
-    public static void save(Context context, OssRecord record) {
+    static void save(Context context, OssRecord record) {
         SQLiteDatabase db = OssDatabase.getSingleton(context).getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(OssRecord.COLUMN_PATH, record.path);
@@ -42,7 +42,7 @@ public class OssDatabase extends SQLiteOpenHelper {
         db.insert(OssRecord.TABLE_NAME, "", values);
     }
 
-    public static List<OssRecord> queryAll(Context context) {
+    static List<OssRecord> queryAll(Context context) {
         SQLiteDatabase db = OssDatabase.getSingleton(context).getReadableDatabase();
 
         List<OssRecord> records = new ArrayList<>();
@@ -86,14 +86,14 @@ public class OssDatabase extends SQLiteOpenHelper {
     }
 
 
-    public static class OssRecord {
-        public static final String TABLE_NAME = "OssRecord";
-        public static final String COLUMN_ID = "id";
-        public static final String COLUMN_PATH = "path";
+    static class OssRecord {
+        static final String TABLE_NAME = "OssRecord";
+        static final String COLUMN_ID = "id";
+        static final String COLUMN_PATH = "path";
 
-        public String path;
+        String path;
 
-        public OssRecord(String path) {
+        OssRecord(String path) {
             this.path = path;
         }
     }

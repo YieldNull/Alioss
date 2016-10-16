@@ -1,5 +1,6 @@
 package com.yieldnull.alioss;
 
+import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -20,25 +21,14 @@ import android.provider.Settings;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 
-import com.alibaba.sdk.android.oss.ClientConfiguration;
 import com.alibaba.sdk.android.oss.ClientException;
 import com.alibaba.sdk.android.oss.OSSClient;
 import com.alibaba.sdk.android.oss.ServiceException;
 import com.alibaba.sdk.android.oss.callback.OSSCompletedCallback;
 import com.alibaba.sdk.android.oss.callback.OSSProgressCallback;
-import com.alibaba.sdk.android.oss.common.auth.OSSFederationCredentialProvider;
-import com.alibaba.sdk.android.oss.common.auth.OSSFederationToken;
 import com.alibaba.sdk.android.oss.internal.OSSAsyncTask;
 import com.alibaba.sdk.android.oss.model.PutObjectRequest;
 import com.alibaba.sdk.android.oss.model.PutObjectResult;
-import com.aliyuncs.DefaultAcsClient;
-import com.aliyuncs.http.MethodType;
-import com.aliyuncs.http.ProtocolType;
-import com.aliyuncs.profile.DefaultProfile;
-import com.aliyuncs.profile.IClientProfile;
-import com.aliyuncs.sts.model.v20150401.AssumeRoleRequest;
-import com.aliyuncs.sts.model.v20150401.AssumeRoleResponse;
-
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -64,22 +54,45 @@ public class OssService extends Service {
     /**
      * Intent Action。开启 Service
      */
-    private static final String ACTION_START = "com.bbbbiu.oss.OssService.action.ENABLE";
+    private static final String ACTION_START = "com.yieldnull.alioss.OssService.action.ENABLE";
 
     /**
      * Intent Action。停止 Service
      */
-    private static final String ACTION_STOP = "com.bbbbiu.oss.OssService.action.DISABLE";
+    private static final String ACTION_STOP = "com.yieldnull.alioss.OssService.action.DISABLE";
+
+
+    /**
+     * 初始化配置
+     */
+    private static OssProfile sOssProfile;
+
+
+    /**
+     * 初始化配置
+     *
+     * @param ossProfile oss 配置
+     * @see OssProfile
+     */
+    public static void init(OssProfile ossProfile) {
+        OssService.sOssProfile = ossProfile;
+    }
 
     /**
      * 开启 Service
      *
      * @param context context
+     * @throws IllegalArgumentException 未初始化
+     * @see #init(OssProfile)
      */
     public static void startService(Context context) {
-        Intent intent = new Intent(context, OssService.class);
-        intent.setAction(ACTION_START);
-        context.startService(intent);
+        if (sOssProfile != null) {
+            Intent intent = new Intent(context, OssService.class);
+            intent.setAction(ACTION_START);
+            context.startService(intent);
+        } else {
+            throw new IllegalArgumentException("OssProfile can not be NULL");
+        }
     }
 
     /**
@@ -144,7 +157,7 @@ public class OssService extends Service {
         /**
          * PendingIntent Action
          */
-        public static final String ACTION_START = "com.bbbbiu.oss.OssService$AlarmReceiver.action_START";
+        public static final String ACTION_START = "com.yieldnull.alioss.OssService$AlarmReceiver.action_START";
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -167,21 +180,15 @@ public class OssService extends Service {
         }
     }
 
-    private static final String ENDPOINT = "http://oss-cn-hangzhou.aliyuncs.com";
-    private static final String BUCKET = "bbbbiu";
+    /**
+     * 每次任务的上传文件数
+     */
+    private static final int FILES_PER_TASK = 10;
 
-    private static final String ACCESS_KEY_ID = "fJz5S0BUgLwXLkCN";
-    private static final String ACCESS_KEY_SECRET = "KY4UuDDK0exXatDK953DbMcOzlhLq0";
-    private static final String ACCESS_ROLE_ARN = "acs:ram::1326723194111613:role/oss-bbbbiu-writer";
-
-    private static final long ALARM_INTERVAL = AlarmManager.INTERVAL_HALF_HOUR;
-
-    private static final long MAX_FILE_SIZE = 1024 * 1024 * 500;
+    /**
+     * 文件达到此大小则显示进度
+     */
     private static final long MIN_SIZE_TO_PROGRESS = 1024 * 1024 * 10;
-
-    private static final String URL_TEST_ONLINE = "http://www.baidu.com";
-
-    private static final int TASKS_PER_EXE = 10;
 
     private Handler mMainHandler;
     private Handler mWorkingHandler;
@@ -202,23 +209,14 @@ public class OssService extends Service {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
+    @SuppressLint("HardwareIds")
     @Override
     public void onCreate() {
         super.onCreate();
 
         Log.i(TAG, "OnCreate");
 
-        mOssClient = new OSSClient(this,
-                ENDPOINT,
-                new OSSFederationCredentialProvider() {
-                    @Override
-                    public OSSFederationToken getFederationToken() {
-                        return OssSts.assumeRole(ACCESS_KEY_ID, ACCESS_KEY_SECRET,
-                                ACCESS_ROLE_ARN, mAndroidId,
-                                null, ProtocolType.HTTPS);
-                    }
-                },
-                new ClientConfiguration());
+        mOssClient = new OSSClient(this, sOssProfile.endpoint, sOssProfile.credentialProvider);
 
         mMediaScanner = new MediaScanner(this);
         mAndroidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -238,8 +236,8 @@ public class OssService extends Service {
 
         alarmManager.setInexactRepeating(
                 AlarmManager.RTC,
-                System.currentTimeMillis() + ALARM_INTERVAL,
-                ALARM_INTERVAL,
+                System.currentTimeMillis() + sOssProfile.alarmInterval,
+                sOssProfile.alarmInterval,
                 AlarmReceiver.getPendingIndent(this)
         );
     }
@@ -275,6 +273,9 @@ public class OssService extends Service {
         super.onDestroy();
     }
 
+    /**
+     * 开始上传
+     */
     private void startUpload() {
         NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
 
@@ -284,7 +285,7 @@ public class OssService extends Service {
             return;
         }
 
-        if (mTaskErrCounter == TASKS_PER_EXE) {
+        if (mTaskErrCounter == FILES_PER_TASK) {
             Log.i(TAG, "Remote Server Error On ALL TASKs. Aborting");
             stopSelf();
             return;
@@ -309,7 +310,7 @@ public class OssService extends Service {
                     return;
                 }
 
-                List<OSSAsyncTask> tasks = spawnSomeTask(TASKS_PER_EXE);
+                List<OSSAsyncTask> tasks = spawnSomeTask(FILES_PER_TASK);
 
                 if (tasks.size() == 0) {
                     Log.i(TAG, "There is no media files to handle. Aborting...");
@@ -347,6 +348,9 @@ public class OssService extends Service {
 
     }
 
+    /**
+     * 取消所有上传任务，关闭服务
+     */
     private void stopUpload() {
         Log.i(TAG, "Stopping all current pending tasks");
 
@@ -381,7 +385,7 @@ public class OssService extends Service {
             }
 
             // 限制文件大小
-            if (file.length() > MAX_FILE_SIZE) {
+            if (file.length() > sOssProfile.maxFileSize) {
                 Log.i(TAG, "File too large. Ignore it");
                 continue;
             }
@@ -394,7 +398,7 @@ public class OssService extends Service {
             String fileName = mAndroidId + "/" + file.getParentFile().getName() + "/" + timestamp + " " + file.getName();
 
             PutObjectRequest putRequest = new PutObjectRequest(
-                    BUCKET,
+                    sOssProfile.bucket,
                     fileName,
                     file.getAbsolutePath());
 
@@ -459,7 +463,7 @@ public class OssService extends Service {
         OkHttpClient client = new OkHttpClient();
         try {
             Response response = client.newCall(new Request.Builder()
-                    .url(URL_TEST_ONLINE)
+                    .url(sOssProfile.urlTestOnline)
                     .build()).execute();
             response.body().close();
             return true;
@@ -503,65 +507,6 @@ public class OssService extends Service {
         return taskList;
     }
 
-    /**
-     * <a href="https://help.aliyun.com/document_detail/28756.html">Aliyun STS</a>，用来获取OSS临时访问权限
-     */
-    private static class OssSts {
-        private static final String TAG = OssSts.class.getSimpleName();
-
-        private static final String REGION_CN_HANGZHOU = "cn-hangzhou";
-        private static final String STS_API_VERSION = "2015-04-01";
-
-        /**
-         * 给<a href="https://help.aliyun.com/document_detail/28645.html">RAM用户</a> 赋予
-         * <a href="https://help.aliyun.com/document_detail/28649.html">角色</a>，
-         * 使该用户能够访问OSS资源
-         *
-         * @param accessKeyId     RAM 用户的 AccessKeyId
-         * @param accessKeySecret RAM 用户的 AccessKeySecret
-         * @param roleArn         角色 Arn
-         * @param roleSessionName 角色名
-         * @param policy          附加 Policy
-         * @param protocolType    请使用 HTTPS
-         * @return OSSFederationToken
-         */
-        public static OSSFederationToken assumeRole(String accessKeyId, String accessKeySecret,
-                                                    String roleArn, String roleSessionName, String policy,
-                                                    ProtocolType protocolType) {
-
-            AssumeRoleResponse response = null;
-
-            try {
-                IClientProfile profile = DefaultProfile.getProfile(REGION_CN_HANGZHOU, accessKeyId, accessKeySecret);
-                DefaultAcsClient client = new DefaultAcsClient(profile);
-
-                AssumeRoleRequest request = new AssumeRoleRequest();
-                request.setVersion(STS_API_VERSION);
-                request.setMethod(MethodType.POST);
-                request.setProtocol(protocolType);
-
-                request.setRoleArn(roleArn);
-                request.setRoleSessionName(roleSessionName);
-                request.setPolicy(policy);
-
-                response = client.getAcsResponse(request);
-            } catch (com.aliyuncs.exceptions.ClientException e) {
-                Log.w(TAG, e);
-            }
-
-            if (response == null) {
-                return null;
-            }
-
-            AssumeRoleResponse.Credentials credentials = response.getCredentials();
-
-            return new OSSFederationToken(
-                    credentials.getAccessKeyId(),
-                    credentials.getAccessKeySecret(),
-                    credentials.getSecurityToken(),
-                    credentials.getExpiration());
-        }
-    }
 
     /**
      * 从 {@link MediaStore} 获取媒体数据。
@@ -575,13 +520,13 @@ public class OssService extends Service {
          *
          * @see MediaScanner#scanVideo()
          */
-        public static final List<String> VIDEO_EXTENSION = Arrays.asList(
+        static final List<String> VIDEO_EXTENSION = Arrays.asList(
                 "3gp", "mp4", "m4v", "mkv", "flv", "rmvb", "rm", "mov", "webm", "avi", "wmv"
         );
 
         private Context context;
 
-        public MediaScanner(Context context) {
+        MediaScanner(Context context) {
             this.context = context;
         }
 
@@ -591,7 +536,7 @@ public class OssService extends Service {
          * @return 图片绝对路径列表，不保证文件存在。
          * @see android.provider.MediaStore.Images
          */
-        public List<String> scanImage() {
+        List<String> scanImage() {
             List<String> imageList = new ArrayList<>();
 
             Log.i(TAG, "Start scanning image files");
@@ -636,7 +581,7 @@ public class OssService extends Service {
          * @see android.provider.MediaStore.Files
          * @see MediaScanner#scanFileWithExtension(Context, List)
          */
-        public List<String> scanVideo() {
+        List<String> scanVideo() {
             List<String> videoList = new ArrayList<>();
             Log.i(TAG, "Start scanning video files");
 
@@ -682,7 +627,7 @@ public class OssService extends Service {
          * @param extensionList 文件后缀名列表，用来计算 MIME_TYPE
          * @return 文件绝对路径列表，不保证文件存在
          */
-        public List<String> scanFileWithExtension(Context context, List<String> extensionList) {
+        List<String> scanFileWithExtension(Context context, List<String> extensionList) {
             Log.i(TAG, "Start scanning files with extension:" + extensionList.toString());
 
             List<String> resultSet = new ArrayList<>();

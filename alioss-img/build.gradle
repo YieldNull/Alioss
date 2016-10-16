@@ -9,6 +9,8 @@ android {
         targetSdkVersion 24
         versionCode 2
         versionName "0.1.1"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
         release {
@@ -20,11 +22,15 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
+
     testCompile 'junit:junit:4.12'
 
-    compile 'com.aliyun.dpa:oss-android-sdk:2.2.0'
-    compile 'com.aliyun:aliyun-java-sdk-core:2.1.7'
-    compile 'com.aliyun:aliyun-java-sdk-sts:2.1.6'
+    androidTestCompile 'com.android.support.test:runner:0.5'
+    androidTestCompile 'com.android.support.test:rules:0.5'
+    androidTestCompile 'org.hamcrest:hamcrest-library:1.3'
+
+    compile 'com.android.support:support-annotations:24.2.1'
+    compile 'com.aliyun.dpa:oss-android-sdk:2.3.0'
 }
 
 apply plugin: 'com.jfrog.bintray'
