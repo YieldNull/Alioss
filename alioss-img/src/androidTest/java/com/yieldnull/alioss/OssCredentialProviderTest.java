@@ -31,8 +31,8 @@ public class OssCredentialProviderTest {
     private static final String BUCKET = "yieldnull-test";
     private static final String ENDPOINT = "http://oss-cn-hangzhou.aliyuncs.com";
 
-    private static final String URL_STS = "http://192.168.1.102/auth/sts";
-    private static final String URL_CUSTOM = "http://192.168.1.102/auth/custom";
+    private static final String URL_STS = "http://192.168.1.104/auth/sts";
+    private static final String URL_CUSTOM = "http://192.168.1.104/auth/custom";
 
     private Context context = InstrumentationRegistry.getTargetContext();
 
@@ -40,13 +40,13 @@ public class OssCredentialProviderTest {
     /**
      * 测试STS：在根目录下上传失败
      *
-     * @throws Exception
+     * @throws Exception e
      */
     @Test(expected = ServiceException.class)
     @SuppressLint("HardwareIds")
     public void federationTokenTest() throws Exception {
-        OssProfile.DefaultFederationCredentialProvider provider =
-                new OssProfile.DefaultFederationCredentialProvider(URL_STS, BUCKET,
+        OssConfig.DefaultFederationCredentialProvider provider =
+                new OssConfig.DefaultFederationCredentialProvider(URL_STS, BUCKET,
                         Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID));
 
         assertThat(provider.getFederationToken(), notNullValue());
@@ -57,13 +57,13 @@ public class OssCredentialProviderTest {
     /**
      * 测试STS：在其它目录下上传失败
      *
-     * @throws Exception
+     * @throws Exception e
      */
     @Test(expected = ServiceException.class)
     @SuppressLint("HardwareIds")
     public void federationTokenTest1() throws Exception {
-        OssProfile.DefaultFederationCredentialProvider provider =
-                new OssProfile.DefaultFederationCredentialProvider(URL_STS, BUCKET,
+        OssConfig.DefaultFederationCredentialProvider provider =
+                new OssConfig.DefaultFederationCredentialProvider(URL_STS, BUCKET,
                         Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID));
 
         assertThat(provider.getFederationToken(), notNullValue());
@@ -74,15 +74,15 @@ public class OssCredentialProviderTest {
     /**
      * 测试STS：在role目录下上传文件成功
      *
-     * @throws Exception
+     * @throws Exception e
      */
     @Test
     @SuppressLint("HardwareIds")
     public void federationTokenTest2() throws Exception {
         String role = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
 
-        OssProfile.DefaultFederationCredentialProvider provider =
-                new OssProfile.DefaultFederationCredentialProvider(URL_STS, BUCKET, role);
+        OssConfig.DefaultFederationCredentialProvider provider =
+                new OssConfig.DefaultFederationCredentialProvider(URL_STS, BUCKET, role);
 
         assertThat(provider.getFederationToken(), notNullValue());
 
@@ -92,12 +92,12 @@ public class OssCredentialProviderTest {
     /**
      * 测试自签名
      *
-     * @throws Exception
+     * @throws Exception e
      */
     @Test
     public void customSignerCredentialTest() throws Exception {
-        OssProfile.DefaultCustomSignerCredentialProvider provider =
-                new OssProfile.DefaultCustomSignerCredentialProvider(URL_CUSTOM);
+        OssConfig.DefaultCustomSignerCredentialProvider provider =
+                new OssConfig.DefaultCustomSignerCredentialProvider(URL_CUSTOM);
 
         upload(provider);
     }
@@ -106,8 +106,8 @@ public class OssCredentialProviderTest {
      * 测试上传一个文件，不带路径前缀
      *
      * @param provider {@link OSSCredentialProvider}
-     * @throws ClientException
-     * @throws ServiceException
+     * @throws ClientException  e
+     * @throws ServiceException e
      */
     private void upload(OSSCredentialProvider provider) throws ClientException, ServiceException {
         upload(provider, null);
@@ -118,8 +118,8 @@ public class OssCredentialProviderTest {
      *
      * @param provider {@link OSSCredentialProvider}
      * @param prefix   路径前缀
-     * @throws ClientException
-     * @throws ServiceException
+     * @throws ClientException  e
+     * @throws ServiceException e
      */
     private void upload(OSSCredentialProvider provider, String prefix) throws ClientException, ServiceException {
         byte[] uploadData = new byte[100 * 1024];

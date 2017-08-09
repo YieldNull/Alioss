@@ -29,7 +29,7 @@ import okhttp3.ResponseBody;
  * <p>
  * Created by yieldnull on 10/14/16.
  */
-public class OssProfile {
+public class OssConfig {
     final String endpoint;
     final String bucket;
 
@@ -43,7 +43,7 @@ public class OssProfile {
     final String urlTestOnline;
 
 
-    public OssProfile(Builder builder) {
+    public OssConfig(Builder builder) {
         endpoint = builder.endpoint;
         bucket = builder.bucket;
 
@@ -90,7 +90,6 @@ public class OssProfile {
             this.credentialProvider = credentialProvider;
         }
 
-
         public Builder setAlarmInterval(long alarmInterval) {
             this.alarmInterval = alarmInterval;
             return this;
@@ -126,8 +125,8 @@ public class OssProfile {
             return this;
         }
 
-        public OssProfile build() {
-            return new OssProfile(this);
+        public OssConfig build() {
+            return new OssConfig(this);
         }
     }
 
@@ -229,5 +228,4 @@ public class OssProfile {
             }
         }
     }
-
 }

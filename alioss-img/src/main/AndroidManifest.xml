@@ -16,8 +16,7 @@
         <service
             android:name="com.yieldnull.alioss.OssService"
             android:enabled="true"
-            android:exported="false"
-            android:process=":alioss" />
+            android:exported="false" />
 
         <receiver
             android:name="com.yieldnull.alioss.OssService$WifiStateReceiver"

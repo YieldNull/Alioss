@@ -12,6 +12,7 @@ import android.database.Cursor;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -29,6 +30,7 @@ import com.alibaba.sdk.android.oss.callback.OSSProgressCallback;
 import com.alibaba.sdk.android.oss.internal.OSSAsyncTask;
 import com.alibaba.sdk.android.oss.model.PutObjectRequest;
 import com.alibaba.sdk.android.oss.model.PutObjectResult;
+
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
@@ -46,7 +48,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 /***
- * 将图片，视频自动备份至阿里云<a href="https://help.aliyun.com/document_detail/31883.html">OSS</a>。Service 会在 “:alioss”进程中运行
+ * 将图片，视频自动备份至阿里云<a href="https://help.aliyun.com/document_detail/31883.html">OSS</a>
  */
 public class OssService extends Service {
     private static final String TAG = OssService.class.getSimpleName();
@@ -65,17 +67,17 @@ public class OssService extends Service {
     /**
      * 初始化配置
      */
-    private static OssProfile sOssProfile;
+    private static OssConfig sOssConfig;
 
 
     /**
      * 初始化配置
      *
-     * @param ossProfile oss 配置
-     * @see OssProfile
+     * @param ossConfig oss 配置
+     * @see OssConfig
      */
-    public static void init(OssProfile ossProfile) {
-        OssService.sOssProfile = ossProfile;
+    public static void init(OssConfig ossConfig) {
+        OssService.sOssConfig = ossConfig;
     }
 
     /**
@@ -83,15 +85,15 @@ public class OssService extends Service {
      *
      * @param context context
      * @throws IllegalArgumentException 未初始化
-     * @see #init(OssProfile)
+     * @see #init(OssConfig)
      */
     public static void startService(Context context) {
-        if (sOssProfile != null) {
+        if (sOssConfig != null) {
             Intent intent = new Intent(context, OssService.class);
             intent.setAction(ACTION_START);
             context.startService(intent);
         } else {
-            throw new IllegalArgumentException("OssProfile can not be NULL");
+            throw new IllegalArgumentException("OssConfig can not be NULL");
         }
     }
 
@@ -109,8 +111,12 @@ public class OssService extends Service {
     /**
      * 接收 {@link WifiManager#NETWORK_STATE_CHANGED_ACTION} 广播，用来停止 Service。
      * 当 {@link WifiManager#getWifiState()} 为 {@link WifiManager#WIFI_STATE_DISABLED} 时停止。
+     * 当 {@link WifiManager#getWifiState()} 为 {@link WifiManager#WIFI_STATE_ENABLED}，且已经连上WIFI时，开启Service
+     * <p>
      * 接收 {@link ConnectivityManager#CONNECTIVITY_ACTION} 广播，用来开启 Service。
      * 当 {@link NetworkInfo#getType()} 为 {@link ConnectivityManager#TYPE_WIFI} 时开启。
+     * <p>
+     * android.net.conn.CONNECTIVITY_CHANGE is deprecated for app targeting N or higher
      */
     public static class WifiStateReceiver extends BroadcastReceiver {
         private static final String TAG = WifiStateReceiver.class.getSimpleName();
@@ -122,7 +128,7 @@ public class OssService extends Service {
 
             if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
 
-                WifiManager wifiManager = (WifiManager) context.getSystemService(WIFI_SERVICE);
+                WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(WIFI_SERVICE);
 
                 if (wifiManager.getWifiState() == WifiManager.WIFI_STATE_DISABLED) {
 
@@ -130,6 +136,15 @@ public class OssService extends Service {
                     Log.i(TAG, "Stopping OssService");
 
                     OssService.stopService(context);
+                } else if (wifiManager.getWifiState() == WifiManager.WIFI_STATE_ENABLED) {
+                    WifiInfo info = wifiManager.getConnectionInfo();
+                    if (info != null && info.getSSID() != null) {
+                        Log.i(TAG, "Received broadcast. WIFI_STATE_ENABLED. Connected to WIFI.");
+
+                        Log.i(TAG, "Starting OssService");
+
+                        OssService.startService(context);
+                    }
                 }
 
             } else if (action.equals(ConnectivityManager.CONNECTIVITY_ACTION)) {
@@ -216,7 +231,7 @@ public class OssService extends Service {
 
         Log.i(TAG, "OnCreate");
 
-        mOssClient = new OSSClient(this, sOssProfile.endpoint, sOssProfile.credentialProvider);
+        mOssClient = new OSSClient(this, sOssConfig.endpoint, sOssConfig.credentialProvider);
 
         mMediaScanner = new MediaScanner(this);
         mAndroidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -236,8 +251,8 @@ public class OssService extends Service {
 
         alarmManager.setInexactRepeating(
                 AlarmManager.RTC,
-                System.currentTimeMillis() + sOssProfile.alarmInterval,
-                sOssProfile.alarmInterval,
+                System.currentTimeMillis() + sOssConfig.alarmInterval,
+                sOssConfig.alarmInterval,
                 AlarmReceiver.getPendingIndent(this)
         );
     }
@@ -385,7 +400,7 @@ public class OssService extends Service {
             }
 
             // 限制文件大小
-            if (file.length() > sOssProfile.maxFileSize) {
+            if (file.length() > sOssConfig.maxFileSize) {
                 Log.i(TAG, "File too large. Ignore it");
                 continue;
             }
@@ -398,7 +413,7 @@ public class OssService extends Service {
             String fileName = mAndroidId + "/" + file.getParentFile().getName() + "/" + timestamp + " " + file.getName();
 
             PutObjectRequest putRequest = new PutObjectRequest(
-                    sOssProfile.bucket,
+                    sOssConfig.bucket,
                     fileName,
                     file.getAbsolutePath());
 
@@ -463,7 +478,7 @@ public class OssService extends Service {
         OkHttpClient client = new OkHttpClient();
         try {
             Response response = client.newCall(new Request.Builder()
-                    .url(sOssProfile.urlTestOnline)
+                    .url(sOssConfig.urlTestOnline)
                     .build()).execute();
             response.body().close();
             return true;

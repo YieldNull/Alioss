@@ -1,0 +1,84 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+
+    <PreferenceCategory android:title="@string/setting_category_oss">
+
+        <ListPreference
+            android:defaultValue="@string/setting_default_list_endpoint"
+            android:entries="@array/setting_entry_endpoint"
+            android:entryValues="@array/setting_value_endpoint"
+            android:key="@string/setting_key_list_endpoint"
+            android:summary="@string/setting_summary_list_endpoint"
+            android:title="@string/setting_title_list_endpoint" />
+        <EditTextPreference
+            android:defaultValue="@null"
+            android:key="@string/setting_key_text_bucket"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:summary="@string/setting_summary_text_bucket"
+            android:title="Bucket" />
+    </PreferenceCategory>
+
+
+    <PreferenceScreen
+        android:key="@string/setting_key_subscreen_auth"
+        android:summary="@string/setting_summary_subscreen_auth"
+        android:title="@string/setting_title_subscreen_auth">
+
+        <intent android:action="com.yieldnull.alioss.AuthPreferenceActivity.START_FROM_PREFERENCE" />
+
+    </PreferenceScreen>
+
+    <PreferenceCategory android:title="@string/setting_category_directory">
+
+        <MultiSelectListPreference
+            android:defaultValue="@array/setting_value_default_media"
+            android:entries="@array/setting_entry_media"
+            android:entryValues="@array/setting_value_media"
+            android:key="@string/setting_key_multi_media"
+            android:summary="@string/setting_summary_multi_media"
+            android:title="@string/setting_title_multi_media" />
+
+        <PreferenceScreen
+            android:key="@string/setting_key_subscreen_folder_include"
+            android:summary="@string/setting_summary_subscreen_folder_include"
+            android:title="同步文件夹">
+
+
+        </PreferenceScreen>
+        <PreferenceScreen
+            android:key="@string/setting_key_subscreen_folder_exclude"
+            android:summary="@string/setting_summary_subscreen_folder_exclude"
+            android:title="不同步文件夹">
+
+        </PreferenceScreen>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/setting_category_service">
+
+        <ListPreference
+            android:defaultValue="@string/setting_default_list_filesize"
+            android:entries="@array/setting_entry_filesize"
+            android:entryValues="@array/setting_value_filesize"
+            android:key="@string/setting_key_list_filesize"
+            android:summary="@string/setting_summary_list_filesize"
+            android:title="@string/setting_title_list_filesize" />
+
+        <ListPreference
+            android:defaultValue="@string/setting_default_list_alarm"
+            android:entries="@array/setting_entry_alarm"
+            android:entryValues="@array/setting_value_alarm"
+            android:key="@string/setting_key_list_alarm"
+            android:summary="@string/setting_summary_list_alarm"
+            android:title="@string/setting_title_list_alarm" />
+
+        <EditTextPreference
+            android:defaultValue="@string/setting_default_text_testonline"
+            android:key="@string/setting_key_text_testonline"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:summary="@string/setting_summary_text_testonline"
+            android:title="@string/setting_title_text_testonline" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

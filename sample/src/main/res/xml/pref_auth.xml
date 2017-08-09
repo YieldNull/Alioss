@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory android:title="@string/setting_category_auth_server">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="@string/setting_key_switch_auth_server"
+            android:title="@string/setting_title_switch_auth_server" />
+
+        <EditTextPreference
+            android:defaultValue="@string/setting_default_text_auth_server_address"
+            android:key="@string/setting_key_text_auth_server_address"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:summary="@string/setting_summary_text_auth_server_address"
+            android:title="@string/setting_title_text_auth_server_address" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/setting_category_auth_plain">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="@string/setting_key_switch_auth_plain"
+            android:title="@string/setting_title_switch_auth_plain" />
+        <EditTextPreference
+            android:defaultValue="@null"
+            android:key="@string/setting_key_text_auth_plain_id"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:summary="@string/setting_summary_text_auth_plain_id"
+            android:title="@string/setting_title_text_auth_plain_id" />
+        <EditTextPreference
+            android:defaultValue="@null"
+            android:key="@string/setting_key_text_auth_plain_secret"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:summary="@string/setting_summary_text_auth_plain_secret"
+            android:title="@string/setting_title_text_auth_plain_secret" />
+    </PreferenceCategory>
+</PreferenceScreen>

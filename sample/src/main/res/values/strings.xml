@@ -1,3 +1,139 @@
 <resources>
     <string name="app_name">Alioss</string>
+    <string name="title_activity_settings">Settings</string>
+
+
+    <string name="setting_category_oss">OSS配置</string>
+    <string name="setting_category_auth_server">服务器授权</string>
+    <string name="setting_category_auth_plain">明文授权</string>
+    <string name="setting_category_service">上传设置</string>
+    <string name="setting_category_directory">文件列表</string>
+    <string name="setting_category_folder_include">同步文件夹</string>
+    <string name="setting_category_folder_exclude">不同步文件夹</string>
+
+    <string name="setting_key_subscreen_auth">subscreen_auth</string>
+    <string name="setting_key_subscreen_folder_include">subscreen_folder_include</string>
+    <string name="setting_key_subscreen_folder_exclude">subscreen_folder_exclude</string>
+
+    <string name="setting_key_list_endpoint">endpoint</string>
+    <string name="setting_key_list_filesize">filesize</string>
+    <string name="setting_key_list_alarm">alarm</string>
+    <string name="setting_key_switch_auth_plain">auth_plain</string>
+    <string name="setting_key_switch_auth_server">auth_server</string>
+    <string name="setting_key_text_bucket">bucket</string>
+    <string name="setting_key_text_auth_plain_id">auth_plain_id</string>
+    <string name="setting_key_text_auth_plain_secret">auth_plain_secret</string>
+    <string name="setting_key_text_auth_server_address">auth_server_address</string>
+    <string name="setting_key_text_testonline">testonline</string>
+    <string name="setting_key_multi_media">media_type</string>
+
+    <string-array name="setting_entry_endpoint">
+        <item>青岛</item>
+        <item>北京</item>
+        <item>杭州</item>
+        <item>香港</item>
+        <item>华南1</item>
+        <item>上海</item>
+        <item>美国硅谷</item>
+        <item>亚太（新加坡）</item>
+    </string-array>
+
+    <string-array name="setting_value_endpoint">
+        <item>http://oss-cn-qingdao.aliyuncs.com</item>
+        <item>http://oss-cn-beijing.aliyuncs.com</item>
+        <item>http://oss-cn-hangzhou.aliyuncs.com</item>
+        <item>http://oss-cn-hongkong.aliyuncs.com</item>
+        <item>http://oss-cn-shenzhen.aliyuncs.com</item>
+        <item>http://oss-cn-shanghai.aliyuncs.com</item>
+        <item>http://oss-us-west-1.aliyuncs.com</item>
+        <item>http://oss-ap-southeast-1.aliyuncs.com</item>
+    </string-array>
+
+    <string-array name="setting_entry_filesize">
+        <item>0.5GB</item>
+        <item>1GB</item>
+        <item>2GB</item>
+        <item>4GB</item>
+        <item>不限制</item>
+    </string-array>
+
+    <string-array name="setting_value_filesize">
+        <item>500</item>
+        <item>1024</item>
+        <item>2048</item>
+        <item>4096</item>
+        <item>-1</item>
+    </string-array>
+
+
+    <string-array name="setting_entry_alarm">
+        <item>30分钟</item>
+        <item>1小时</item>
+        <item>2小时</item>
+        <item>4小时</item>
+    </string-array>
+
+    <string-array name="setting_value_alarm">
+        <item>30</item>
+        <item>60</item>
+        <item>120</item>
+        <item>240</item>
+    </string-array>
+
+    <string name="media_type_photo">photo</string>
+    <string name="media_type_audio">audio</string>
+    <string name="media_type_movie">movie</string>
+
+    <string-array name="setting_entry_media">
+        <item>图片</item>
+        <item>音频</item>
+        <item>视频</item>
+    </string-array>
+
+    <string-array name="setting_value_media">
+        <item>@string/media_type_photo</item>
+        <item>@string/media_type_audio</item>
+        <item>@string/media_type_movie</item>
+    </string-array>
+
+    <string-array name="setting_value_default_media">
+        <item>@string/media_type_photo</item>
+    </string-array>
+
+    <string name="setting_default_text_auth_server_address">https://server.com/auth</string>
+    <string name="setting_default_list_alarm">30</string>
+    <string name="setting_default_list_endpoint">http://oss-cn-hangzhou.aliyuncs.com</string>
+    <string name="setting_default_list_filesize">-1</string>
+    <string name="setting_default_text_testonline">http://www.baidu.com</string>
+
+    <string name="setting_title_subscreen_auth">授权方式</string>
+    <string name="setting_title_list_endpoint">Endpoint</string>
+    <string name="setting_title_switch_auth_server">服务器授权</string>
+    <string name="setting_title_switch_auth_plain">明文授权</string>
+    <string name="setting_title_text_bucket">Bucket</string>
+    <string name="setting_title_text_auth_server_address">地址</string>
+    <string name="setting_title_text_auth_plain_id">凭证ID</string>
+    <string name="setting_title_text_auth_plain_secret">凭证密钥</string>
+    <string name="setting_title_list_filesize">文件大小</string>
+    <string name="setting_title_list_alarm">同步频率</string>
+    <string name="setting_title_text_testonline">测试联网</string>
+    <string name="setting_title_multi_media">媒体类型</string>
+
+    <string name="setting_summary_list_endpoint">OSS所在节点</string>
+    <string name="setting_summary_text_bucket">存储桶名称</string>
+    <string name="setting_summary_text_auth_plain">授权方式</string>
+    <string name="setting_summary_text_auth_plain_id">AccessKeyId</string>
+    <string name="setting_summary_text_auth_plain_secret">AccessKeySecret</string>
+    <string name="setting_summary_text_auth_server_address">授权服务器地址</string>
+    <string name="setting_summary_list_filesize">最大文件大小</string>
+    <string name="setting_summary_list_alarm">同步程序启动频率</string>
+    <string name="setting_summary_text_testonline">用该地址测试是否联网</string>
+    <string name="setting_summary_multi_media">选择要上传的媒体类型</string>
+
+    <string name="setting_summary_subscreen_auth">选择访问OSS的授权方式</string>
+    <string name="setting_summary_subscreen_folder_include">除媒体文件外还需要同步的文件夹</string>
+    <string name="setting_summary_subscreen_folder_exclude">禁止同步指定文件夹下的媒体文件</string>
+    <string name="authorization_method">授权方式</string>
+
+
 </resources>
